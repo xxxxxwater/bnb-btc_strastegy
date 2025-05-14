@@ -23,7 +23,7 @@ Multi-Scale Decomposition and Feature Extraction
 Utilizing the Morlet wavelet basis function, the order flow data undergoes CWT decomposition to isolate high-frequency noise (<1h), mid-term trends (1h-6h), and long-term cycles (>6h). Low-frequency components are modeled via ARIMA to capture linear statistical patterns, while high-frequency components are fed into an LSTM network to detect nonlinear dynamics such as liquidity pulses and "whale address" anomalies.
 
 Signal Fusion and Optimization
-A dynamic weighting mechanism integrates signals from LSTM (nonlinear responses) and ARIMA (steady-state trends), augmented by RSI (14-period) to filter overbought/oversold signals and reduce false trading frequency. Cointegration filtering constructs a BTC-ETH spread portfolio, leveraging the Johansen test to establish long-term equilibrium relationships and dynamically discard signals deviating from the cointegration space.
+A dynamic weighting mechanism integrates signals from LSTM (nonlinear responses) and ARIMA (steady-state trends), augmented by RSI (14-period) to filter overbought/oversold signals and reduce false trading frequency. Cointegration filtering constructs a BTC-BNB spread portfolio, leveraging the Johansen test to establish long-term equilibrium relationships and dynamically discard signals deviating from the cointegration space.
 
 Risk Control and Performance Validation
 Backtesting parameters include signal latency <300ms, holding periods of 1-4h, and a transaction fee rate of 0.05%. Empirical results on 2023 BTC/USDT data demonstrate significant signal quality improvements: Sharpe ratio increases to 3.72 (vs. 2.94 for standalone LSTM), maximum drawdown reduced to 1.9%, and a win rate of 58.7%, highlighting enhanced robustness.
