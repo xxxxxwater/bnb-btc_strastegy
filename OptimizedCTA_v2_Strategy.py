@@ -1,6 +1,8 @@
 # pragma pylint: disable=missing-docstring, invalid-name, pointless-string-statement
 # flake8: noqa: F401
 # isort: skip_file
+
+以下只开源超优化止盈参数 平衡信号器（未开源）部分
 # --- 基础库导入 ---
 import numpy as np
 import pandas as pd
