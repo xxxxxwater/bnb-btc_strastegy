@@ -25,101 +25,103 @@ from freqtrade.strategy import (
 )
 import talib.abstract as ta
 from technical import qtpylib
+import numpy as np
+import pandas as pd
+import pywt
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.vector_ar.vecm import coint_johansen
+from keras.models import Sequential
+from keras.layers import LSTM, Dense
+from ta.momentum import RSIIndicator
 
-class OptimizedCTAStrategy(IStrategy):
+# 1. 数据预处理模块
+def preprocess_data(data):
+    # 输入数据包含：timestamp, price, volume, bid_depth, ask_depth
+    data['mid_price'] = (data['bid_price'] + data['ask_price'])/2
+    data['imbalance'] = data['bid_depth'] / (data['bid_depth'] + data['ask_depth'])
     
-
-    can_short = False   
-    timeframe = '15m'
-    process_only_new_candles = True
-    startup_candle_count = 100
-
-    # 风险管理参数
-    stoploss = -0.45 # 单笔最大亏损45%（考虑杠杆后实际为22.5%本金）
-    use_custom_stoploss = True
-    position_adjustment_enable = True
-    max_entry_position_adjustment = 4
-
-    # 动态止盈参数
-    minimal_roi = {
-        "0": 0.12,    #原来0.15
-        "10": 0.10,   #原来0.10
-        "30": 0.08,   #原来0.05
-        "45": 0.06,   #原来没有
-        "60": 0
-    }
-
-    # 追踪止损参数
-    trailing_stop = True
-    trailing_stop_positive = 0.04  # 盈利3%后激活
-    trailing_stop_positive_offset = 0.08 # 从8%利润开始追踪
-    trailing_only_offset_is_reached = True
-
-    # 订单类型
-    order_types = {
-        'entry': 'market',
-        'exit': 'market',
-        'emergencyexit': 'market',
-        'forceentry': "market",
-        'stoploss': 'market',
-        'stoploss_on_exchange': False,
-        'stoploss_on_exchange_interval': 60,
-        'stoploss_on_exchange_limit_ratio': 0.99
-    }
-
-    # Hyperoptable parameters
-    buy_rsi = IntParameter(low=1, high=50, default=13, space="buy", optimize=True, load=True)
-    sell_rsi = IntParameter(low=50, high=100, default=78, space="sell", optimize=True, load=True)
-    short_rsi = IntParameter(low=51, high=100, default=74, space="sell", optimize=True, load=True)
-    exit_short_rsi = IntParameter(low=1, high=50, default=30, space="buy", optimize=True, load=True)
-
-    # Number of candles the strategy requires before producing valid signals
-    startup_candle_count: int = 100
+    # 计算RSI
+    rsi = RSIIndicator(close=data['mid_price'], window=14)
+    data['rsi'] = rsi.rsi()
     
-    # Optional order time in force.
-    order_time_in_force = {"entry": "GTC", "exit": "GTC"}
+    return data.dropna()
 
-    plot_config = {
-        "main_plot": {
-            "tema": {},
-            "sar": {"color": "white"},
-        },
-        "subplots": {
-            "MACD": {
-                "macd": {"color": "blue"},
-                "macdsignal": {"color": "orange"},
-            },
-            "RSI": {
-                "rsi": {"color": "red"},
-            },
-        },
+# 2. 多尺度小波分解模块
+def wavelet_decomposition(series, scales=np.arange(1, 128)):
+    # 使用Morlet小波进行连续小波变换
+    coefficients, frequencies = pywt.cwt(series, scales, 'morl')
+    
+    # 定义不同时间尺度组件
+    high_freq = coefficients[scales <= 60*12]   # <1小时 (12个5分钟周期)
+    mid_freq = coefficients[(scales > 60*12) & (scales <= 60*72)]  # 1-6小时
+    low_freq = coefficients[scales > 60*72]     # >6小时
+    
+    return {
+        'high': high_freq.mean(axis=0),
+        'mid': mid_freq.mean(axis=0),
+        'low': low_freq.mean(axis=0)
     }
 
-    def informative_pairs(self):
-        """
-        Define additional, informative pair/interval combinations to be cached from the exchange.
-        These pair/interval combinations are non-tradeable, unless they are part
-        of the whitelist as well.
-        For more information, please consult the documentation
-        :return: List of tuples in the format (pair, interval)
-            Sample: return [("ETH/USDT", "5m"),
-                            ("BTC/USDT", "15m"),
-                            ]
-        """
-        return []
+# 3. ARIMA模型组件
+def arima_forecast(series, order=(2,1,2)):
+    model = ARIMA(series, order=order)
+    results = model.fit()
+    return results.forecast(steps=1)[0]
 
-    def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        """
-        Adds several different TA indicators to the given DataFrame
+# 4. LSTM模型组件
+def build_lstm_model(input_shape):
+    model = Sequential()
+    model.add(LSTM(64, input_shape=input_shape, return_sequences=True))
+    model.add(LSTM(32))
+    model.add(Dense(1))
+    model.compile(loss='mse', optimizer='adam')
+    return model
 
-        Performance Note: For the best performance be frugal on the number of indicators
-        you are using. Let uncomment only the indicator you are using in your strategies
-        or your hyperopt configuration, otherwise you will waste your memory and CPU usage.
-        :param dataframe: Dataframe with data from the exchange
-        :param metadata: Additional information, like the currently traded pair
-        :return: a Dataframe with all mandatory indicators for the strategies
-        """
+# 5. 协整过滤模块
+def cointegration_filter(btc, eth):
+    # Johansen协整检验
+    df = pd.concat([btc, eth], axis=1)
+    jres = coint_johansen(df, 0, 1)
+    return jres.lr1[0] > jres.cvt[0, 1]  # 检查是否存在协整关系
 
+# 6. 信号融合与生成
+def generate_signals(data):
+    # 多尺度分解
+    decomposed = wavelet_decomposition(data['mid_price'])
+    
+    # 低频分量预测
+    arima_pred = arima_forecast(decomposed['low'])
+    
+    # 高频分量预测
+    lstm_input = decomposed['high'].reshape(-1, 1)
+    lstm_model = build_lstm_model((lstm_input.shape[1], 1))
+    lstm_model.fit(lstm_input[:-100], decomposed['low'][1:-99], epochs=10)
+    lstm_pred = lstm_model.predict(lstm_input[-100:])
+    
+    # 动态权重融合
+    combined_signal = 0.6*lstm_pred + 0.4*arima_pred
+    
+    # RSI过滤
+    if data['rsi'].iloc[-1] > 70:
+        combined_signal *= 0.5
+    elif data['rsi'].iloc[-1] < 30:
+        combined_signal *= 0.5
+    
+    return combined_signal
+
+# 主执行流程
+if __name__ == "__main__":
+    # 加载数据 (示例)
+    raw_data = pd.read_csv('BTC_USDT_2023.csv', parse_dates=['timestamp'])
+    processed_data = preprocess_data(raw_data)
+    
+    # 协整检查
+    eth_data = pd.read_csv('ETH_USDT_2023.csv', parse_dates=['timestamp'])
+    if cointegration_filter(processed_data['mid_price'], eth_data['mid_price']):
+        signals = generate_signals(processed_data)
+        # 执行交易逻辑和风险管理
+    
+        
         # Momentum Indicators
         # ------------------------------------
 
@@ -329,70 +331,6 @@ class OptimizedCTAStrategy(IStrategy):
 
 
         
-        return dataframe
+        
 
-    def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        """
-        Based on TA indicators, populates the entry signal for the given dataframe
-        :param dataframe: DataFrame
-        :param metadata: Additional information, like the currently traded pair
-        :return: DataFrame with entry columns populated
-        """
-        dataframe.loc[
-            (
-                # Signal: RSI crosses above 30
-                (qtpylib.crossed_above(dataframe["rsi"], self.buy_rsi.value))
-                & (dataframe["tema"] <= dataframe["bb_middleband"])  # Guard: tema below BB middle
-                & (dataframe["tema"] > dataframe["tema"].shift(1))  # Guard: tema is raising
-                & (dataframe["volume"] > 0)  # Make sure Volume is not 0
-            ),
-            "enter_long",
-        ] = 1
-
-        dataframe.loc[
-            (
-                # Signal: RSI crosses above 70
-                (qtpylib.crossed_above(dataframe["rsi"], self.short_rsi.value))
-                & (dataframe["tema"] > dataframe["bb_middleband"])  # Guard: tema above BB middle
-                & (dataframe["tema"] < dataframe["tema"].shift(1))  # Guard: tema is falling
-                & (dataframe["volume"] > 0)  # Make sure Volume is not 0
-            ),
-            "enter_short",
-        ] = 1
-
-        return dataframe
-
-    def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        """
-        Based on TA indicators, populates the exit signal for the given dataframe
-        :param dataframe: DataFrame
-        :param metadata: Additional information, like the currently traded pair
-        :return: DataFrame with exit columns populated
-        """
-        dataframe.loc[
-            (
-                # Signal: RSI crosses above 70
-                (qtpylib.crossed_above(dataframe["rsi"], self.sell_rsi.value))
-                & (dataframe["tema"] > dataframe["bb_middleband"])  # Guard: tema above BB middle
-                & (dataframe["tema"] < dataframe["tema"].shift(1))  # Guard: tema is falling
-                & (dataframe["volume"] > 0)  # Make sure Volume is not 0
-            ),
-            "exit_long",
-        ] = 1
-
-        dataframe.loc[
-            (
-                # Signal: RSI crosses above 30
-                (qtpylib.crossed_above(dataframe["rsi"], self.exit_short_rsi.value))
-                &
-                # Guard: tema below BB middle
-                (dataframe["tema"] <= dataframe["bb_middleband"])
-                & (dataframe["tema"] > dataframe["tema"].shift(1))  # Guard: tema is raising
-                & (dataframe["volume"] > 0)  # Make sure Volume is not 0
-            ),
-            "exit_short",
-        ] = 1
-
-
-
-        return dataframe
+    
