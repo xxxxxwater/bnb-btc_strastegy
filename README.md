@@ -29,4 +29,5 @@ Risk Control and Performance Validation
 Backtesting parameters include signal latency <300ms, holding periods of 1-4h, and a transaction fee rate of 0.05%. Empirical results on 2023 BTC/USDT data demonstrate significant signal quality improvements: Sharpe ratio increases to 3.72 (vs. 2.94 for standalone LSTM), maximum drawdown reduced to 1.9%, and a win rate of 58.7%, highlighting enhanced robustness.
 
 
+<img width="574" alt="image" src="https://github.com/user-attachments/assets/82a368ae-d1e5-4615-8c76-2c7d2499c0e5" />
 
