@@ -1,5 +1,7 @@
 
 
+
+
     # ============ 追踪止损参数 ============
     trailing_stop = True
     trailing_stop_positive = 0.03  # 盈利3%后激活
