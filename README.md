@@ -7,7 +7,6 @@ Signal Generation
 41.88CAGR%, 0.28 Drawdown. (V4 version)
 2. Currently it is a super optimized version. The strategy is to load at least three years of trading data through the super optimized pure indicator calculation (high-performance computing equipment) of the deleted time series (no prediction) model and deep learning module. This version (v2 version) can still achieve 19% CRAHR/2.78% drawdown through dynamic stop profit and high regression currency.
 
-3. For version iteration, this strategy has very little profit for each signal trigger. Probably part of it is accumulated from small profits, and then the circuit breaker mechanism is added to the suspension mechanism to filter out black swans. The profit spread to each signal transaction is about 4,000, and the benchmark requires extremely high liquidity and autoregression.
 
 
 
