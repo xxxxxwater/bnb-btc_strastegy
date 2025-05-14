@@ -31,3 +31,5 @@ Backtesting parameters include signal latency <300ms, holding periods of 1-4h, a
 
 <img width="574" alt="image" src="https://github.com/user-attachments/assets/82a368ae-d1e5-4615-8c76-2c7d2499c0e5" />
 
+The open source part is the signal part of bnb btc strategy v2, and the above backtesting results are from v4 version and are not open source. But the v2 part can already achieve a maximum drawdown of less than 2% and a Sharpe ratio of 3.52. It is the result of abandoning the use of ARIMA prediction and comparing it with a single LSTM model.
+
