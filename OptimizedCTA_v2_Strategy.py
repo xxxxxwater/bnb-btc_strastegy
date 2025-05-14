@@ -89,14 +89,13 @@ def generate_signals(data):
     # 多尺度分解
     decomposed = wavelet_decomposition(data['mid_price'])
     
-    # 低频分量预测
-    arima_pred = arima_forecast(decomposed['low'])
-    
-    # 高频分量预测
-    lstm_input = decomposed['high'].reshape(-1, 1)
-    lstm_model = build_lstm_model((lstm_input.shape[1], 1))
-    lstm_model.fit(lstm_input[:-100], decomposed['low'][1:-99], epochs=10)
-    lstm_pred = lstm_model.predict(lstm_input[-100:])
+    # 低频分量
+    #arima_pred = arima_forecast(decomposed['low'])
+    # 高频分量
+    #lstm_input = decomposed['high'].reshape(-1, 1)
+    #lstm_model = build_lstm_model((lstm_input.shape[1], 1))
+    #lstm_model.fit(lstm_input[:-100], decomposed['low'][1:-99], epochs=10)
+    #lstm_pred = lstm_model.predict(lstm_input[-100:])
     
     # 动态权重融合
     combined_signal = 0.6*lstm_pred + 0.4*arima_pred
