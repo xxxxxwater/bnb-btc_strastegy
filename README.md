@@ -10,7 +10,7 @@ Signal Generation
 
 
 
-信号的处理
+Signal processing
 ![v2-ce847a68014f8087c5735d6346dd76c4_1440w](https://github.com/user-attachments/assets/0b2694b2-09a7-4951-979e-bcf343a5afc3)
 
 Multi-Scale Wavelet Decomposition and LSTM-ARIMA-RSI Fusion Model for Cryptocurrency Trading Signal Generation
