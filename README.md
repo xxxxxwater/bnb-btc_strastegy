@@ -1,7 +1,5 @@
 Signal Generation
-# CTA_Strastegy
-
-41.88CAGR %、0.28 Drawdown。（V4版本）
+# CTA_Strastegy_BNB_BTC
 
 
 41.88CAGR%, 0.28 Drawdown. (V4 version)
