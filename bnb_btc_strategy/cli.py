@@ -20,6 +20,9 @@ def load_csv(path: str) -> pd.DataFrame:
         raise ValueError("CSV dates must be unique and valid")
     if not data["date"].is_monotonic_increasing:
         raise ValueError("CSV must be sorted chronologically")
+    gaps = data["date"].diff().dropna()
+    if not gaps.eq(pd.Timedelta(minutes=15)).all():
+        raise ValueError("CSV must contain contiguous 15-minute candles")
     return data.set_index("date")
 
 
