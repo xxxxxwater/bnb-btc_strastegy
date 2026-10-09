@@ -11,3 +11,8 @@ docker pull ghcr.io/xxxxxwater/bnb-btc_strastegy:v0.3.0
 ~~~
 
 Do not treat workflow configuration as proof of successful publication. Verify green workflow, actual Release, and visible GHCR package. The GITHUB_TOKEN must have contents:write and packages:write; host settings can still block publishing. The image contains no credentials, and running it requires external strategy config. Mutable base image must be digest-pinned in a production deployment. No private V4 model is shipped and no performance guarantees apply.
+
+
+## v0.4.0 MLSD publish
+
+The v0.4.0 source integrates MLSD v0.2.1 from its SHA-pinned upstream source archive. The release workflow installs the MLSD extra during tests and Docker build, and only creates v0.4.0 GitHub Release after the GHCR image push succeeds. The v0.3.0 versioned image and GitHub release are retained. Verify publication before pulling ghcr.io/xxxxxwater/bnb-btc_strastegy:v0.4.0.

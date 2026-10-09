@@ -6,6 +6,54 @@
 
 > Research-only, not financial advice. This repository is **not** the private V4 strategy, and no historical return metrics are established for this rebuilt engine.
 
+
+## v0.4.0 — MLSD structured-data feature engineering (new)
+
+The [Machine Learning for Structured Data](https://github.com/xxxxxwater/Machine_Learning_For_Structured_Data) **v0.2.1** implementation is now integrated as a pinned, real upstream runtime dependency. The deterministic v0.3.0 wavelet-inspired + RSI + BTC/BNB spread baseline is retained, and MLSD adds a strictly opt-in machine-learning confidence gate. This is not the unpublished private V4 model.
+
+| Layer | v0.4.0 code |
+| --- | --- |
+| Raw inputs | Unique, chronological, contiguous **closed** BTC/BNB 15m OHLCV bars and exact peer index alignment |
+| Typed MLSD | Five 32-bar Series: asset/peer log returns, relative returns, volume changes and candle ranges |
+| Statistics | MLSD SDataFrame / BasicSeries -> **105** prefixed scalar features (5 x 21) |
+| Train/evaluation | Offline 3-class logistic model, PurgedEventTimeSeriesSplit and independent trailing 20% holdout |
+| Model file | Auditable JSON, no Python pickle, SHA-pinned MLSD dependency, schema + feature ordering + trained-label maturity |
+| Execution gate | Optional, per-pair local artifact, model + original technical signal required; **fail closed** on missing or mismatched inputs |
+
+### Offline training / validation
+
+~~~bash
+python -m pip install -e '.[test,mlsd]'
+python -m pytest
+
+bnb-btc-mlsd-train \
+  --asset-pair BTC/USDT:USDT --asset BTC_15m.csv --benchmark BNB_15m.csv \
+  --window 32 --horizon 4 \
+  --model-output models/btc.json --report-output models/btc-report.json
+
+bnb-btc-mlsd-train \
+  --asset-pair BNB/USDT:USDT --asset BNB_15m.csv --benchmark BTC_15m.csv \
+  --window 32 --horizon 4 \
+  --model-output models/bnb.json --report-output models/bnb-report.json
+~~~
+
+Both CSVs contain date,open,high,low,close,volume at exactly 15m UTC-aligned intervals. No exchange connection or trading is performed by the training CLI. Review classification OOS metrics separately from economic performance; there are **no verified profitability or Sharpe results** for this implementation.
+
+### Optional Freqtrade gate (dry-run only)
+
+~~~bash
+export BNB_BTC_MLSD_ENABLED=1
+export BNB_BTC_MLSD_BTC_MODEL_PATH=/trusted/models/btc.json
+export BNB_BTC_MLSD_BNB_MODEL_PATH=/trusted/models/bnb.json
+# config.json must retain dry_run=true, initial_state=stopped
+~~~
+
+If MLSD is disabled, the original v0.3.0 technical signal still runs. If enabled but a model, peer feed or training schema is missing/mismatched, **all new entries for that pair are blocked**, while exit indicators remain available. A trained model cannot be used for pre-training in-sample bars, because the inference gate enforces a cutoff later than its latest training label maturity.
+
+See [MLSD integration guide](docs/MLSD_INTEGRATION.md). The default released container does **not** contain training models or exchange credentials, and downloading it does not enable trading.
+
+---
+
 ## What's actually implemented in v0.3.0?
 
 The original open-source file referenced undefined 'lstm_pred' and 'arima_pred' variables and an undefined 'dataframe', so it could not run. The old ETH strategy was only an invalid indented fragment; the configured Freqtrade class was missing. The v0.3.0 overhaul implements a **different, functional, causal, non-forecast baseline**, not a reproduction of an unreleased learned model.

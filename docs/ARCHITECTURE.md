@@ -9,3 +9,8 @@ The online spread gate estimates rolling log-price hedge coefficients and uses t
 Fail-closed rules for new entries: missing counterpart, invalid OHLCV, insufficient history, non-computable spread and unsupported pair. Exit signals do not require available counterpart data. Freqtrade sample uses isolated 1x and -5% stoploss, illustrative only; execution-level liquidation prevention, slippage limits, funding, reconciliation, owned-order handling, broker kill switch, failure recovery and real exchange tests are **not implemented**.
 
 Benchmarks, walk-forward validation, transaction fees, funding and overfit controls are required before making any performance claims. Any timeframe other than 15m requires new calibration of wavelet periods.
+
+
+## v0.4.0 MLSD Layer
+
+A separate adapter builds five strictly trailing 32-bar Series in MLSD containers and extracts 105 deterministic BasicSeries statistics. Purged label-aware offline training creates pair-bound JSON models, while the Freqtrade gate restricts entries to eligible post-training bars and fails closed on missing, stale, incompatible or mismatched per-pair model inputs. For model schema and evaluation safety rules, read [MLSD_INTEGRATION.md](MLSD_INTEGRATION.md).
