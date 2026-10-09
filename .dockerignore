@@ -1,0 +1,12 @@
+**/.git
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+**/.venv
+**/.env
+**/config.private.json
+**/config.json
+tests/
+*.pdf
+*.jpg
+*.png

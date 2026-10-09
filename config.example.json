@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.freqtrade.io/schema.json",
+  "bot_name": "bnb-btc-research",
+  "strategy": "OptimizedCTAStrategy",
+  "strategy_path": "user_data/strategies",
+  "timeframe": "15m",
+  "dry_run": true,
+  "dry_run_wallet": 10000,
+  "initial_state": "stopped",
+  "force_entry_enable": false,
+  "max_open_trades": 2,
+  "stake_currency": "USDT",
+  "stake_amount": 100,
+  "tradable_balance_ratio": 0.8,
+  "fiat_display_currency": "USD",
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
+  "cancel_open_orders_on_exit": false,
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {
+      "enableRateLimit": true
+    },
+    "pair_whitelist": ["BTC/USDT:USDT", "BNB/USDT:USDT"],
+    "pair_blacklist": []
+  },
+  "pairlists": [{"method": "StaticPairList"}],
+  "unfilledtimeout": {"entry": 10, "exit": 10, "unit": "minutes"},
+  "entry_pricing": {"price_side": "other", "use_order_book": true, "order_book_top": 1},
+  "exit_pricing": {"price_side": "other", "use_order_book": true, "order_book_top": 1},
+  "api_server": {"enabled": false},
+  "telegram": {"enabled": false},
+  "internals": {"process_throttle_secs": 5}
+}
