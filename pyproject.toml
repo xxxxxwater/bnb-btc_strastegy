@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bnb-btc-strategy"
+version = "0.3.0"
+description = "Causal multi-scale BTC/BNB signal research and Freqtrade adapter"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24,<3", "pandas>=2.0,<3"]
+classifiers = ["Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License"]
+
+[project.optional-dependencies]
+research = ["statsmodels>=0.14,<1"]
+test = ["pytest>=8,<10"]
+dev = ["pytest>=8,<10", "ruff>=0.8,<1"]
+
+[project.scripts]
+bnb-btc-signals = "bnb_btc_strategy.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["bnb_btc_strategy*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
