@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install -e '.[test]'
+      - run: python -m pip install -e '.[test,mlsd]'
       - run: python -m pip check
       - run: python -m compileall -q bnb_btc_strategy OptimizedCTA_v2_Strategy.py OptimizedETHStrategy.py
       - run: python -m pytest

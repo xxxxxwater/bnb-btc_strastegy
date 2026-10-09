@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bnb-btc-strategy"
-version = "0.3.0"
+version = "0.4.0"
 description = "Causal multi-scale BTC/BNB signal research and Freqtrade adapter"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,11 +13,13 @@ classifiers = ["Programming Language :: Python :: 3"]
 
 [project.optional-dependencies]
 research = ["statsmodels>=0.14,<1"]
+mlsd = ["mlsd-structured-data @ https://github.com/xxxxxwater/Machine_Learning_For_Structured_Data/archive/85e356c1fb6703fef2b03ac0070c5e0659e8c671.tar.gz"]
 test = ["pytest>=8,<10"]
 dev = ["pytest>=8,<10", "ruff>=0.8,<1"]
 
 [project.scripts]
 bnb-btc-signals = "bnb_btc_strategy.cli:main"
+bnb-btc-mlsd-train = "bnb_btc_strategy.mlsd_train:main"
 
 [tool.setuptools.packages.find]
 include = ["bnb_btc_strategy*"]

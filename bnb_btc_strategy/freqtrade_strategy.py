@@ -6,6 +6,7 @@ Other pairs and unavailable / stale benchmark data fail closed for entries.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import pandas as pd
@@ -24,6 +25,9 @@ class BaseBTCCointegrationStrategy(IStrategy):
     INTERFACE_VERSION = 3
     timeframe = "15m"
     startup_candle_count = 200
+    # Never activate an unvalidated model by default.
+    mlsd_enabled = os.environ.get("BNB_BTC_MLSD_ENABLED", "0") == "1"
+    mlsd_model_path = os.environ.get("BNB_BTC_MLSD_MODEL_PATH", "")
     process_only_new_candles = True
     can_short = True
 
@@ -101,6 +105,38 @@ class BaseBTCCointegrationStrategy(IStrategy):
         output = calculate_features(
             dataframe, benchmark_close=benchmark, config=self.signal_config
         )
+        if self.mlsd_enabled:
+            # Fail closed for *entries* on missing model, peer, schema drift,
+            # upstream MLSD import errors or data integrity violations.
+            # Exits and broker stoploss are independent of the model.
+            output["mlsd_prob_short"] = float("nan")
+            output["mlsd_prob_neutral"] = float("nan")
+            output["mlsd_prob_long"] = float("nan")
+            output["mlsd_gate"] = False
+            try:
+                if benchmark is None:
+                    raise ValueError("benchmark feed unavailable")
+                from .mlsd_layer import infer_probabilities, read_model
+
+                model = read_model(self.mlsd_model_path)
+                probs = infer_probabilities(output, benchmark, model)
+                for field in probs.columns:
+                    output[field] = probs[field]
+                limit = model["threshold"]
+                output["enter_long"] = (
+                    (output["enter_long"] == 1)
+                    & probs["mlsd_prob_long"].ge(limit)
+                ).astype(int)
+                output["enter_short"] = (
+                    (output["enter_short"] == 1)
+                    & probs["mlsd_prob_short"].ge(limit)
+                ).astype(int)
+                output["mlsd_gate"] = True
+            except Exception as exc:
+                # No silent fallback to the technical-only model on MLSD failure.
+                LOG.error("MLSD fail-closed for %s: %s", pair, exc)
+                output["enter_long"] = 0
+                output["enter_short"] = 0
         return output
 
     def populate_entry_trend(self, dataframe: pd.DataFrame, metadata: dict) -> pd.DataFrame:
@@ -108,7 +144,10 @@ class BaseBTCCointegrationStrategy(IStrategy):
         enabled = pair in PAIRS
         dataframe["enter_long"] = (dataframe["enter_long"] if enabled else 0)
         dataframe["enter_short"] = (dataframe["enter_short"] if enabled else 0)
-        dataframe["enter_tag"] = "causal_wavelet_rsi_spread"
+        dataframe["enter_tag"] = (
+            "causal_wavelet_rsi_spread_mlsd"
+            if self.mlsd_enabled else "causal_wavelet_rsi_spread"
+        )
         return dataframe
 
     def populate_exit_trend(self, dataframe: pd.DataFrame, metadata: dict) -> pd.DataFrame:
