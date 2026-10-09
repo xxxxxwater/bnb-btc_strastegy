@@ -61,7 +61,7 @@ def test_corrupt_peer_or_irregular_dates_fail_closed():
     broken.loc[60] = np.nan
     features, positions = extract_mlsd_features(bars, broken)
     assert 60 not in positions
-    assert 90 in positions
+    assert 92 in positions  # first 32-bar window fully after missing peer at 60
     with pytest.raises(ValueError, match="index must exactly"):
         extract_mlsd_features(bars, broken.reset_index(drop=True).iloc[::-1])
     bars.loc[80, "date"] += pd.Timedelta(minutes=1)
