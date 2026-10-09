@@ -23,7 +23,8 @@ def test_output_is_finite_when_ready_and_mutually_exclusive():
     assert len(out) == len(data)
     assert not (out["enter_long"] & out["enter_short"]).any()
     assert np.isfinite(out["signal_score"].iloc[150:]).all()
-    assert out["signal_score"].abs().le(1).all()
+    assert out.loc[out["signal_ready"], "signal_score"].abs().le(1).all()
+    assert out["signal_score"].iloc[:48].isna().all()  # EMA warmup is intentional
 
 
 def test_past_does_not_change_when_future_prices_are_edited():
