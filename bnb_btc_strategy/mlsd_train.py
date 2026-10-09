@@ -52,6 +52,7 @@ def train_offline(
     fee_threshold: float = 0.001,
     threshold: float = 0.60,
     n_splits: int = 3,
+    asset_pair: str = "BTC/USDT:USDT",
 ) -> tuple[dict, dict]:
     """Fit on past ONLY; return JSON-safe artifact and non-PnL OOS metrics."""
     from sklearn.metrics import balanced_accuracy_score
@@ -59,6 +60,8 @@ def train_offline(
 
     from .mlsd_layer import BAR, MLSD_SOURCE_SHA, SCHEMA, make_structured_frame
 
+    if asset_pair not in ("BTC/USDT:USDT", "BNB/USDT:USDT"):
+        raise ValueError("asset_pair must be BTC/USDT:USDT or BNB/USDT:USDT")
     if not isinstance(horizon, int) or not 1 <= horizon <= 32:
         raise ValueError("horizon must be in [1, 32]")
     if not (0 < fee_threshold < 0.1):
@@ -116,6 +119,7 @@ def train_offline(
 
     artifact = {
         "schema": SCHEMA,
+        "asset_pair": asset_pair,
         "mlsd_source_sha": MLSD_SOURCE_SHA,
         "window": window,
         "horizon": horizon,
@@ -156,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
     from .mlsd_layer import read_model
 
     parser = argparse.ArgumentParser(description="Train MLSD research model without trading")
+    parser.add_argument("--asset-pair", required=True,
+                        choices=["BTC/USDT:USDT", "BNB/USDT:USDT"])
     parser.add_argument("--asset", required=True)
     parser.add_argument("--benchmark", required=True)
     parser.add_argument("--model-output", required=True)
@@ -170,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
     aligned = peer["close"].shift(1).reindex(asset.index)
     artifact, report = train_offline(
         asset, aligned, horizon=args.horizon, window=args.window,
-        fee_threshold=args.fee_threshold
+        fee_threshold=args.fee_threshold, asset_pair=args.asset_pair
     )
     # Atomic writes: no partially readable artifact.
     destination = Path(args.model_output)

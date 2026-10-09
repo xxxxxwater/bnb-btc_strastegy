@@ -118,7 +118,12 @@ class BaseBTCCointegrationStrategy(IStrategy):
                     raise ValueError("benchmark feed unavailable")
                 from .mlsd_layer import infer_probabilities, read_model
 
-                model = read_model(self.mlsd_model_path)
+                pair_key = ("BNB_BTC_MLSD_BTC_MODEL_PATH" if pair == PAIRS[0]
+                            else "BNB_BTC_MLSD_BNB_MODEL_PATH")
+                model_path = os.environ.get(pair_key) or self.mlsd_model_path
+                model = read_model(model_path)
+                if model["asset_pair"] != pair:
+                    raise ValueError("model artifact asset_pair does not match traded pair")
                 probs = infer_probabilities(output, benchmark, model)
                 for field in probs.columns:
                     output[field] = probs[field]

@@ -139,6 +139,8 @@ def read_model(path: str | Path) -> dict:
         raise ValueError("missing model feature columns")
     if len(model["columns"]) != len(set(model["columns"])):
         raise ValueError("duplicate model features")
+    if model.get("asset_pair") not in ("BTC/USDT:USDT", "BNB/USDT:USDT"):
+        raise ValueError("model must be bound to BTC or BNB asset pair")
     if model.get("classes") != [-1, 0, 1]:
         raise ValueError("expected three model classes [-1, 0, 1]")
     n = len(model["columns"])
