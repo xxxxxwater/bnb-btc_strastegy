@@ -1,0 +1,11 @@
+# Architecture, assumptions and gaps
+
+Input contract: fully closed 15-minute BTC and BNB OHLCV bars, synchronized UTC timestamps, strictly positive prices and volume. The current technical baseline does **not** consume true order-book depth, ARIMA forecasts or LSTM weights.
+
+Closed-candle log returns -> lag-only Morlet-inspired sub-hour/1–6h/>6h convolutions -> bounded score mixed with EMA(12/48) -> RSI(14) -> trailing BTC/BNB spread deviation gate -> Freqtrade long/short entry/exit.
+
+The online spread gate estimates rolling log-price hedge coefficients and uses the coefficient lagged one bar; the standardized residual is a causal *proxy*, not evidence of cointegration. A Johansen trace diagnostic (statsmodels extra) is available for offline research on matched complete history, with its own limitations.
+
+Fail-closed rules for new entries: missing counterpart, invalid OHLCV, insufficient history, non-computable spread and unsupported pair. Exit signals do not require available counterpart data. Freqtrade sample uses isolated 1x and -5% stoploss, illustrative only; execution-level liquidation prevention, slippage limits, funding, reconciliation, owned-order handling, broker kill switch, failure recovery and real exchange tests are **not implemented**.
+
+Benchmarks, walk-forward validation, transaction fees, funding and overfit controls are required before making any performance claims. Any timeframe other than 15m requires new calibration of wavelet periods.
