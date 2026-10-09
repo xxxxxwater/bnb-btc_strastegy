@@ -75,6 +75,7 @@ class BaseBTCCointegrationStrategy(IStrategy):
                         and {"date", "close"}.issubset(reference.columns)):
                     informative = reference[["date", "close"]].copy()
                     informative = informative.rename(columns={"close": "benchmark_close"})
+                    informative["benchmark_timestamp"] = informative["date"]
                     # Freqtrade shifts same-timeframe informative candles to
                     # prevent trading on a reference candle not yet closed.
                     dataframe = merge_informative_pair(
@@ -83,7 +84,18 @@ class BaseBTCCointegrationStrategy(IStrategy):
                     )
                     field = "benchmark_close_" + self.timeframe
                     if field in dataframe:
-                        benchmark = dataframe[field]
+                        timestamp_field = "benchmark_timestamp_" + self.timeframe
+                        if timestamp_field in dataframe:
+                            traded_at = pd.to_datetime(dataframe["date"], utc=True)
+                            benchmark_at = pd.to_datetime(
+                                dataframe[timestamp_field], utc=True
+                            )
+                            age = traded_at - benchmark_at
+                            # Do not ffill a partner feed indefinitely.
+                            fresh = age.ge(pd.Timedelta(0)) & age.le(
+                                pd.Timedelta(minutes=15)
+                            )
+                            benchmark = dataframe[field].where(fresh)
             except (KeyError, ValueError, TypeError, AttributeError) as exc:
                 LOG.warning("Benchmark unavailable for %s (%s); entry disabled", pair, exc)
         output = calculate_features(
