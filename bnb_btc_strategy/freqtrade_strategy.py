@@ -84,7 +84,7 @@ class BaseBTCCointegrationStrategy(IStrategy):
                     "Counterpart candle alignment failed for %s: %s; entries fail closed",
                     pair, exc,
                 )
-                output = calculate_features(
+        output = calculate_features(
             dataframe, benchmark_close=benchmark, config=self.signal_config
         )
         if self.mlsd_enabled:
