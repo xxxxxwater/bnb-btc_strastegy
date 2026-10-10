@@ -1,0 +1,66 @@
+name: Refresh v0.4.1 GHCR compatibility tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    # Deliberately mutable compatibility tag, requested by the operator.
+    # No GitHub release or Git tag is moved by this job.
+    if: "${{ github.event.head_commit.message == 'build: refresh v0.4.1 GHCR' }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Require existing v0.4.1 release, exact version and source revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -c 'import tomllib; assert tomllib.load(open("pyproject.toml", "rb"))["project"]["version"] == "0.4.1"'
+          test "$(gh release view v0.4.1 --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)" = "v0.4.1"
+          test -n "$GITHUB_SHA"
+      - name: Validate integration, model security and syntax
+        run: |
+          python -m pip install -e '.[test,mlsd]'
+          python -m pip check
+          python -m ruff check bnb_btc_strategy --select E4,E7,E9,F
+          python -m compileall -q bnb_btc_strategy OptimizedCTA_v2_Strategy.py OptimizedETHStrategy.py
+          python -m pytest
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build, smoke-test and push exactly the requested compatibility image
+        uses: docker/build-push-action@v6
+        id: publish
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:v0.4.1
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=0.4.1
+            org.opencontainers.image.description=Mutable v0.4.1 GHCR compatibility refresh; compare revision label with original immutable Git tag
+      - name: Display exact immutable digest
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          test -n "$IMAGE_DIGEST"
+          echo "GHCR digest: $IMAGE_DIGEST"
+          echo "Image source revision: $GITHUB_SHA"
+          echo "This rebuild intentionally does NOT move the v0.4.1 Git tag or Release."

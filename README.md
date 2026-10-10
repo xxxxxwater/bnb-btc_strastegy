@@ -7,6 +7,8 @@
 > Research-only, not financial advice. This repository is **not** the private V4 strategy, and no historical return metrics are established for this rebuilt engine.
 
 
+**Post-release GHCR compatibility refresh:** `:v0.4.1` may be rebuilt from newer commits on `main` without changing the historical GitHub Release tag. Check the OCI source revision and immutable digest before use. See [container tag policy](docs/IMAGE_REFRESH.md).
+
 ## v0.4.1 — Time-alignment and model-provenance hardening
 
 This release corrects a **material** data-integrity risk in v0.4.0: the Freqtrade same-timeframe informative merge could use a different benchmark candle from the offline trainer. Training, CSV export, and execution now share one strict timestamp adapter: at asset candle opening time **t**, they use **only** the benchmark candle opening at **t−15 minutes**.
