@@ -1,9 +1,9 @@
 name: Python validation
 on:
   push:
-    branches: [main]
+    branches: [main, V5]
   pull_request:
-    branches: [main]
+    branches: [main, V5]
 permissions:
   contents: read
 jobs:

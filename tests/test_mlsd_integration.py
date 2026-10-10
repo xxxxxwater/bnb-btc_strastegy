@@ -131,3 +131,41 @@ def test_full_data_fingerprint_changes_with_ohlcv_peer_and_time():
     shifted = bars.copy()
     shifted["date"] += pd.Timedelta(minutes=15)
     assert dataset_fingerprint(shifted, peer) != reference
+
+
+def test_training_skips_malformed_future_target_bars():
+    bars, peer = sample(450)
+    reference, _ = train_offline(bars, peer, n_splits=2)
+    broken = bars.copy()
+    # This OHLCV corruption contaminates several future targets in addition
+    # to the trailing feature windows. A valid earlier feature must not use
+    # this malformed later candle as its label.
+    broken.loc[120, "high"] = broken.loc[120, "close"] * 0.99
+    model, report = train_offline(broken, peer, n_splits=2)
+    assert model["dataset_sha256"] != reference["dataset_sha256"]
+    assert model["training_rows"] < reference["training_rows"]
+    assert report["holdout"]["n_test"] > 0
+
+
+def test_offgrid_candle_series_rejected_without_peer_side_effects():
+    bars, peer = sample(100)
+    bars["date"] += pd.Timedelta(minutes=1)
+    with pytest.raises(ValueError, match="15m UTC grid"):
+        extract_mlsd_features(bars, peer)
+
+
+def test_large_finite_weights_do_not_produce_infinite_predictions():
+    bars, peer = sample()
+    model, _ = train_offline(bars, peer, n_splits=2)
+    model["coef"] = [[1e308] * 105] * 3
+    model["center"] = [0.0] * 105
+    model["scale"] = [1.0] * 105
+    with pytest.raises(ValueError, match="logits overflowed"):
+        infer_probabilities(bars, peer, model)
+
+
+@pytest.mark.parametrize("key", ["fee_threshold", "threshold"])
+def test_training_rejects_nonfinite_tuning_values(key):
+    bars, peer = sample(100)
+    with pytest.raises(ValueError, match=key):
+        train_offline(bars, peer, **{key: float("nan")})
