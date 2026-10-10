@@ -32,6 +32,7 @@ jobs:
           python -m pip install -e '.[test,mlsd]'
           python -m pip check
           python -m compileall -q bnb_btc_strategy OptimizedCTA_v2_Strategy.py OptimizedETHStrategy.py
+          python -m ruff check bnb_btc_strategy --select E4,E7,E9,F
           python -m pytest
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3

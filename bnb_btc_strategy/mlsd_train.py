@@ -5,7 +5,6 @@ No trades, no performance claims, no serialization of executable pickle.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 
@@ -58,7 +57,7 @@ def train_offline(
     from sklearn.metrics import balanced_accuracy_score
     from MLSD.model_selection import PurgedEventTimeSeriesSplit
 
-    from .mlsd_layer import BAR, MLSD_SOURCE_SHA, SCHEMA, make_structured_frame
+    from .mlsd_layer import BAR, MLSD_SOURCE_SHA, SCHEMA, dataset_fingerprint, make_structured_frame
 
     if asset_pair not in ("BTC/USDT:USDT", "BNB/USDT:USDT"):
         raise ValueError("asset_pair must be BTC/USDT:USDT or BNB/USDT:USDT")
@@ -119,6 +118,7 @@ def train_offline(
 
     artifact = {
         "schema": SCHEMA,
+        "benchmark_lag_bars": 1,
         "asset_pair": asset_pair,
         "mlsd_source_sha": MLSD_SOURCE_SHA,
         "window": window,
@@ -135,10 +135,7 @@ def train_offline(
         "trained_through": raw.index[train_ids[-1]].isoformat(),
         "training_rows": int(len(train_ids)),
         "label_counts": {str(k): int((y[train_ids] == k).sum()) for k in (-1, 0, 1)},
-        "dataset_sha256": hashlib.sha256(
-            np.ascontiguousarray(prices).tobytes()
-            + np.ascontiguousarray(pd.to_numeric(benchmark_close).to_numpy()).tobytes()
-        ).hexdigest(),
+        "dataset_sha256": dataset_fingerprint(candles, benchmark_close),
     }
     report = {
         "research_only": True,

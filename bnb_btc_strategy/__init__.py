@@ -3,4 +3,4 @@
 from .core import SignalConfig, calculate_features
 
 __all__ = ["SignalConfig", "calculate_features"]
-__version__ = "0.4.0"
+__version__ = "0.4.1"

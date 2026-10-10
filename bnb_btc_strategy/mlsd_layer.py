@@ -5,13 +5,14 @@ summary. Learned scalers/classifiers are fitted only in mlsd_train.py.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-SCHEMA = "bnb-btc-mlsd/v1"
+SCHEMA = "bnb-btc-mlsd/v2"
 MLSD_SOURCE_SHA = "85e356c1fb6703fef2b03ac0070c5e0659e8c671"
 FEATURE_SERIES = ("asset_returns", "benchmark_returns", "relative_returns",
                   "log_volume_delta", "candle_range")
@@ -124,19 +125,50 @@ def extract_mlsd_features(
     return output, positions
 
 
+def dataset_fingerprint(candles: pd.DataFrame, benchmark_close: pd.Series) -> str:
+    """Hash the *entire* ordered training feature source including timestamps."""
+    from .market_data import _timestamps
+
+    times, _, _ = _validate_and_extract(candles, benchmark_close)
+    # Require one canonical UTC grid. Date changes must alter the fingerprint.
+    if not _timestamps(candles, "asset").equals(times):
+        raise ValueError("dataset timestamps changed during validation")
+    digest = hashlib.sha256()
+    digest.update(times.asi8.astype("<i8").tobytes())
+    for name in ("open", "high", "low", "close", "volume"):
+        values = pd.to_numeric(candles[name], errors="coerce").to_numpy(dtype="<f8")
+        digest.update(values.tobytes())
+    peer = pd.to_numeric(benchmark_close, errors="coerce").to_numpy(dtype="<f8")
+    digest.update(peer.tobytes())
+    return digest.hexdigest()
+
+
+def _no_duplicate_keys(items):
+    result = {}
+    for key, value in items:
+        if key in result:
+            raise ValueError(f"duplicate model JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def read_model(path: str | Path) -> dict:
     """Load checked JSON ONLY (never unpickle an untrusted model)."""
     file = Path(path)
     if not file.is_file() or file.stat().st_size > 2_000_000:
         raise ValueError("model JSON file absent or too large")
     with file.open(encoding="utf-8") as handle:
-        model = json.load(handle)
+        model = json.load(handle, object_pairs_hook=_no_duplicate_keys)
     if not isinstance(model, dict) or model.get("schema") != SCHEMA:
         raise ValueError("MLSD model schema mismatch")
+    if model.get("benchmark_lag_bars") != 1:
+        raise ValueError("model benchmark lag contract mismatch")
     if model.get("mlsd_source_sha") != MLSD_SOURCE_SHA:
         raise ValueError("MLSD upstream revision mismatch")
     if not isinstance(model.get("columns"), list) or not model["columns"]:
         raise ValueError("missing model feature columns")
+    if len(model["columns"]) != 105 or not all(isinstance(c, str) for c in model["columns"]):
+        raise ValueError("unexpected MLSD feature schema")
     if len(model["columns"]) != len(set(model["columns"])):
         raise ValueError("duplicate model features")
     if model.get("asset_pair") not in ("BTC/USDT:USDT", "BNB/USDT:USDT"):
@@ -153,13 +185,20 @@ def read_model(path: str | Path) -> dict:
         raise ValueError("model matrix dimensions mismatch")
     if not all(np.isfinite(a).all() for a in (coef, intercept, center, scale)):
         raise ValueError("model contains nonfinite parameters")
-    if (scale <= 0).any() or model.get("window") not in range(8, 257):
+    if (scale <= 0).any() or type(model.get("window")) is not int or model["window"] not in range(8, 257):
         raise ValueError("invalid scaler or window")
-    if model.get("horizon") not in range(1, 33):
+    if type(model.get("horizon")) is not int or model["horizon"] not in range(1, 33):
         raise ValueError("invalid training horizon")
     if not 0.5 < model.get("threshold", 0) < 1:
         raise ValueError("model confidence threshold must be >0.5 and <1")
     watermark = pd.Timestamp(model.get("label_matured_until"))
+    trained = pd.Timestamp(model.get("trained_through"))
+    if pd.isna(trained) or trained.tzinfo is None or trained > watermark:
+        raise ValueError("training cutoff or label maturity is invalid")
+    fingerprint = model.get("dataset_sha256")
+    if (not isinstance(fingerprint, str) or len(fingerprint) != 64
+            or any(c not in "0123456789abcdef" for c in fingerprint)):
+        raise ValueError("model dataset fingerprint missing or malformed")
     if pd.isna(watermark) or watermark.tzinfo is None:
         raise ValueError("model needs a timezone-aware training maturity cutoff")
     return model
@@ -173,7 +212,8 @@ def infer_probabilities(
     Predictions are intentionally suppressed at or before the timestamp when
     the model's last training label matured (anti in-sample/backtest leakage).
     """
-    if model.get("schema") != SCHEMA or model.get("mlsd_source_sha") != MLSD_SOURCE_SHA:
+    if (model.get("schema") != SCHEMA or model.get("mlsd_source_sha") != MLSD_SOURCE_SHA
+            or model.get("benchmark_lag_bars") != 1):
         raise ValueError("untrusted model schema/upstream")
     features, positions = extract_mlsd_features(
         candles, benchmark_close, window=model["window"]
