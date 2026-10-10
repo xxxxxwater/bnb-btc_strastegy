@@ -63,19 +63,33 @@ def train_offline(
         raise ValueError("asset_pair must be BTC/USDT:USDT or BNB/USDT:USDT")
     if not isinstance(horizon, int) or not 1 <= horizon <= 32:
         raise ValueError("horizon must be in [1, 32]")
-    if not (0 < fee_threshold < 0.1):
+    if not np.isfinite(fee_threshold) or not (0 < fee_threshold < 0.1):
         raise ValueError("fee_threshold must lie in (0, 0.1)")
-    if not (0.5 < threshold < 1):
+    if not np.isfinite(threshold) or not (0.5 < threshold < 1):
         raise ValueError("threshold must lie in (0.5, 1)")
     if not isinstance(n_splits, int) or not 2 <= n_splits <= 5:
         raise ValueError("n_splits must be 2 through 5")
 
     raw, positions = make_structured_frame(candles, benchmark_close, window)
     prices = pd.to_numeric(candles["close"], errors="coerce").to_numpy(dtype=float)
+    # A future closing price is not a valid training label if the intervening
+    # candles are malformed. This checks target quality, never features.
+    ohlcv = {name: pd.to_numeric(candles[name], errors="coerce").to_numpy(dtype=float)
+             for name in ("open", "high", "low", "close", "volume")}
+    future_valid = np.ones(len(prices), dtype=bool)
+    for values in ohlcv.values():
+        future_valid &= np.isfinite(values)
+    future_valid &= ((ohlcv["open"] > 0) & (ohlcv["close"] > 0)
+                     & (ohlcv["low"] > 0) & (ohlcv["volume"] > 0))
+    future_valid &= ohlcv["high"] >= np.maximum(ohlcv["open"], ohlcv["close"])
+    future_valid &= ohlcv["low"] <= np.minimum(ohlcv["open"], ohlcv["close"])
+    future_invalid_prefix = np.r_[0, np.cumsum(~future_valid)]
     keep = []
     labels = []
     for j, t in enumerate(positions):
         if t + horizon >= len(prices):
+            continue
+        if future_invalid_prefix[t + horizon + 1] != future_invalid_prefix[t + 1]:
             continue
         forward = prices[t + horizon] / prices[t]
         if not np.isfinite(forward) or forward <= 0:

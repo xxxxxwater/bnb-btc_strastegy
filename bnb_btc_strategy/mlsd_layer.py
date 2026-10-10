@@ -39,6 +39,8 @@ def _validate_and_extract(
     if (timestamps.hasnans or not timestamps.is_unique
             or not timestamps.is_monotonic_increasing):
         raise ValueError("asset timestamps must be strictly increasing and unique")
+    if (timestamps.asi8 % BAR.value != 0).any():
+        raise ValueError("asset timestamps must align to 15m UTC grid")
     if len(timestamps) > 1 and not (timestamps[1:] - timestamps[:-1] == BAR).all():
         raise ValueError("asset candles must be contiguous 15m intervals")
 
@@ -231,10 +233,17 @@ def infer_probabilities(
             or not np.isfinite(scale).all() or (scale <= 0).any()
             or not np.isfinite(coef).all() or not np.isfinite(intercept).all()):
         raise ValueError("invalid MLSD feature matrix or model coefficients")
-    logits = ((mat - center) / scale) @ coef.T + intercept
+    # Large but JSON-finite coefficients can overflow IEEE-754 arithmetic.
+    # Never return NaN/inf as a "successful" prediction: fail closed.
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        logits = ((mat - center) / scale) @ coef.T + intercept
+    if not np.isfinite(logits).all():
+        raise ValueError("MLSD classifier logits overflowed or are nonfinite")
     logits -= logits.max(axis=1, keepdims=True)
     probs = np.exp(logits)
     probs /= probs.sum(axis=1, keepdims=True)
+    if not np.isfinite(probs).all() or not np.allclose(probs.sum(axis=1), 1):
+        raise ValueError("MLSD produced invalid class probabilities")
     valid = features.index > pd.Timestamp(model["label_matured_until"])
     columns = ["mlsd_prob_short", "mlsd_prob_neutral", "mlsd_prob_long"]
     output = pd.DataFrame(np.nan, index=candles.index, columns=columns)
