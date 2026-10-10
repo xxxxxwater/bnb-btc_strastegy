@@ -10,9 +10,10 @@ import os
 from typing import Any
 
 import pandas as pd
-from freqtrade.strategy import IStrategy, merge_informative_pair
+from freqtrade.strategy import IStrategy
 
 from .core import SignalConfig, calculate_features
+from .market_data import align_previous_benchmark
 
 LOG = logging.getLogger(__name__)
 
@@ -75,34 +76,15 @@ class BaseBTCCointegrationStrategy(IStrategy):
                 reference = self.dp.get_pair_dataframe(
                     pair=counterpart, timeframe=self.timeframe
                 )
-                if (reference is not None and not reference.empty
-                        and {"date", "close"}.issubset(reference.columns)):
-                    informative = reference[["date", "close"]].copy()
-                    informative = informative.rename(columns={"close": "benchmark_close"})
-                    informative["benchmark_timestamp"] = informative["date"]
-                    # Freqtrade shifts same-timeframe informative candles to
-                    # prevent trading on a reference candle not yet closed.
-                    dataframe = merge_informative_pair(
-                        dataframe, informative, self.timeframe, self.timeframe,
-                        ffill=True
-                    )
-                    field = "benchmark_close_" + self.timeframe
-                    if field in dataframe:
-                        timestamp_field = "benchmark_timestamp_" + self.timeframe
-                        if timestamp_field in dataframe:
-                            traded_at = pd.to_datetime(dataframe["date"], utc=True)
-                            benchmark_at = pd.to_datetime(
-                                dataframe[timestamp_field], utc=True
-                            )
-                            age = traded_at - benchmark_at
-                            # Do not ffill a partner feed indefinitely.
-                            fresh = age.ge(pd.Timedelta(0)) & age.le(
-                                pd.Timedelta(minutes=15)
-                            )
-                            benchmark = dataframe[field].where(fresh)
-            except (KeyError, ValueError, TypeError, AttributeError) as exc:
-                LOG.warning("Benchmark unavailable for %s (%s); entry disabled", pair, exc)
-        output = calculate_features(
+                # No same-candle informative merge. Use ONLY benchmark at t-15m
+                # and exact timestamp matches, like the offline training CLI.
+                benchmark = align_previous_benchmark(dataframe, reference)
+            except Exception as exc:
+                LOG.warning(
+                    "Counterpart candle alignment failed for %s: %s; entries fail closed",
+                    pair, exc,
+                )
+                output = calculate_features(
             dataframe, benchmark_close=benchmark, config=self.signal_config
         )
         if self.mlsd_enabled:
@@ -136,7 +118,7 @@ class BaseBTCCointegrationStrategy(IStrategy):
                     (output["enter_short"] == 1)
                     & probs["mlsd_prob_short"].ge(limit)
                 ).astype(int)
-                output["mlsd_gate"] = True
+                output["mlsd_gate"] = probs.notna().all(axis=1)
             except Exception as exc:
                 # No silent fallback to the technical-only model on MLSD failure.
                 LOG.error("MLSD fail-closed for %s: %s", pair, exc)

@@ -157,6 +157,7 @@ def train_offline(
 
 def main(argv: list[str] | None = None) -> int:
     from .cli import load_csv
+    from .market_data import align_previous_benchmark
     from .mlsd_layer import read_model
 
     parser = argparse.ArgumentParser(description="Train MLSD research model without trading")
@@ -173,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
     asset = load_csv(args.asset)
     peer = load_csv(args.benchmark)
     # Only *prior* benchmark candle may be used by the feature extractor.
-    aligned = peer["close"].shift(1).reindex(asset.index)
+    aligned = align_previous_benchmark(asset, peer)
     artifact, report = train_offline(
         asset, aligned, horizon=args.horizon, window=args.window,
         fee_threshold=args.fee_threshold, asset_pair=args.asset_pair

@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from .core import calculate_features
+from .market_data import align_previous_benchmark
 
 
 def load_csv(path: str) -> pd.DataFrame:
@@ -36,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     asset = load_csv(args.asset)
     benchmark = load_csv(args.benchmark)
     # Only the previous completed benchmark candle may be used.
-    aligned = benchmark["close"].shift(1).reindex(asset.index, method="ffill")
+    aligned = align_previous_benchmark(asset, benchmark)
     result = calculate_features(asset, benchmark_close=aligned)
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     result.to_csv(args.output)
