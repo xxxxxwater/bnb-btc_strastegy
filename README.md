@@ -7,6 +7,18 @@
 > Research-only, not financial advice. This repository is **not** the private V4 strategy, and no historical return metrics are established for this rebuilt engine.
 
 
+## v0.4.1 — Time-alignment and model-provenance hardening
+
+This release corrects a **material** data-integrity risk in v0.4.0: the Freqtrade same-timeframe informative merge could use a different benchmark candle from the offline trainer. Training, CSV export, and execution now share one strict timestamp adapter: at asset candle opening time **t**, they use **only** the benchmark candle opening at **t−15 minutes**.
+
+- **No future candle / stale forward fill:** a missing, off-grid, duplicate or old peer candle cannot silently become the newest price. Asset time-grid gaps disable entries.
+- **Auditable MLSD model schema v2:** model JSON requires exactly 105 ordered BasicSeries features, an explicit one-bar benchmark lag, pair identity, label maturity and a complete timestamp/OHLCV/peer dataset fingerprint.
+- **Security:** duplicate JSON object keys are rejected, coefficients and scaler must be finite, and model exports never deserialize pickle.
+- **Observability:** MLSD eligibility is calculated **per candle**, rather than displaying a misleading always-true gate.
+- **Build correctness:** Python 3.10–3.12 tests, Ruff correctness lint, and a Docker build-time import smoke test of the **real Freqtrade V3 adapter**.
+
+**Compatibility:** Retrain model files created with v0.4.0; the v0.4.1 schema intentionally rejects old artifacts rather than silently assuming they were trained under the new timestamp contract. Both releases remain available. Nothing in this release establishes economic profitability or authorizes real-money trading.
+
 ## v0.4.0 — MLSD structured-data feature engineering (new)
 
 The [Machine Learning for Structured Data](https://github.com/xxxxxwater/Machine_Learning_For_Structured_Data) **v0.2.1** implementation is now integrated as a pinned, real upstream runtime dependency. The deterministic v0.3.0 wavelet-inspired + RSI + BTC/BNB spread baseline is retained, and MLSD adds a strictly opt-in machine-learning confidence gate. This is not the unpublished private V4 model.

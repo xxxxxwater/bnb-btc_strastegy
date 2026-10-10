@@ -14,3 +14,8 @@ Benchmarks, walk-forward validation, transaction fees, funding and overfit contr
 ## v0.4.0 MLSD Layer
 
 A separate adapter builds five strictly trailing 32-bar Series in MLSD containers and extracts 105 deterministic BasicSeries statistics. Purged label-aware offline training creates pair-bound JSON models, while the Freqtrade gate restricts entries to eligible post-training bars and fails closed on missing, stale, incompatible or mismatched per-pair model inputs. For model schema and evaluation safety rules, read [MLSD_INTEGRATION.md](MLSD_INTEGRATION.md).
+
+
+## v0.4.1 strict as-of contract
+
+The shared market_data.align_previous_benchmark is now the **single source of truth** for online/offline pairing. For a candle with timestamp t, use only peer[t-15m] with exact UTC grid matching, not same-row informative merges or old ffilled values. The derived MLSD JSON schema v2 requires a one-bar lag marker, whole-source OHLCV/timestamp fingerprint, 105-feature schema, pair-specific model identity and valid training-label maturity. Incorrect or unavailable features fail closed for new entries; model eligibility is visible per candle.

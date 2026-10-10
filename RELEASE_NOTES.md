@@ -1,12 +1,16 @@
-# v0.4.0 — MLSD Feature Engineering Layer
+# v0.4.1 — MLSD candle alignment and model trust hardening
 
-- Integrated actual upstream Machine_Learning_For_Structured_Data v0.2.1 (source commit 85e356c1fb6703fef2b03ac0070c5e0659e8c671).
-- Added 105 causal rolling Series statistics from MLSD SData / SDataFrame / BasicSeries (asset, peer, relative, volume, range).
-- Added offline three-class training and mature-label PurgedEventTimeSeriesSplit validation, plus a trailing untouched time-based holdout.
-- Added JSON-only classifier export with exact feature schema, MLSD source pin, asset-pair binding, training cutoff and dataset fingerprint.
-- Added opt-in Freqtrade confidence gating with separate BTC/BNB model paths; no model or invalid feed/asset/schema => no entries.
-- Added regression coverage for lookahead invariance, missing peer data, contract failure, and train/inference alignment.
-- Expanded Python CI and GHCR image to install MLSD from the pinned upstream source.
-- Preserved previous v0.3.0 algorithm and historical research descriptions; no live production deployment.
+**Bug fixed:** The previous Freqtrade same-timeframe informative merge did not enforce the offline trainer's one-completed-benchmark-bar delay. Live/backtest and offline inference now use one exact timestamp as-of adapter: peer[t−15m] only. Missing or stale peer candles are rejected rather than forward-filled.
 
-Research only: No proven Sharpe, PnL or realistic fee/funding/slippage evaluation. Train and validate with actual historical BTC/BNB data before using capital. Previously published repository secrets must still be rotated.
+**Included:**
+- Shared alignment library with UTC 15m grid, unique/ordered timestamps and contiguous asset bar enforcement.
+- Tests for future-peer mutation invariance, missing peer gaps, malformed timestamps and offline/runtime parity.
+- Versioned **MLSD model schema v2**: pair binding, explicit benchmark lag, exact 105-feature schema, maturity watermark, stricter scaler validation and full OHLCV/peer/timestamp SHA256 fingerprint.
+- JSON duplicate-key defense and validation of nonfinite inference inputs.
+- MLSD gate status now reflects per-candle probability eligibility.
+- CI adds Ruff correctness checks. GHCR Docker build actually imports MLSD **and the installed Freqtrade adapter**.
+- Updated README, security guidance and architecture docs.
+
+**Breaking safety change:** v0.4.0 (schema v1) JSON model files must be **retrained using v0.4.1**. No trained model or exchange credential is included in published images. All trading remains disabled by default in supplied configuration.
+
+No real market PnL or latency benchmark was performed, and no production strategy/server was changed.
