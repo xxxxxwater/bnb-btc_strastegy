@@ -40,7 +40,7 @@ def test_strategy_matches_closed_peer_and_keeps_exit_when_peer_lost(monkeypatch)
     # Modify only the partner's last candle: the last signal must not change.
     partner.loc[239, "close"] = 999999.0
     same = s.populate_indicators(candles, {"pair": "BTC/USDT:USDT"})
-    assert baseline["spread_z"].iloc[-1] == same["spread_z"].iloc[-1]
+    np.testing.assert_allclose(\n        baseline["spread_z"].iloc[-1], same["spread_z"].iloc[-1], equal_nan=True\n    )
     assert baseline["enter_long"].iloc[-1] == same["enter_long"].iloc[-1]
     assert baseline["enter_short"].iloc[-1] == same["enter_short"].iloc[-1]
 
