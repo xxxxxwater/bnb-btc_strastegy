@@ -72,8 +72,6 @@ def train_offline(
 
     raw, positions = make_structured_frame(candles, benchmark_close, window)
     prices = pd.to_numeric(candles["close"], errors="coerce").to_numpy(dtype=float)
-    times = (pd.DatetimeIndex(pd.to_datetime(candles["date"], utc=True))
-             if "date" in candles else pd.DatetimeIndex(candles.index))
     keep = []
     labels = []
     for j, t in enumerate(positions):
