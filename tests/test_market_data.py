@@ -74,3 +74,10 @@ def test_invalid_peer_price_is_not_forward_filled():
     result = align_previous_benchmark(asset, peer)
     assert np.isnan(result.iloc[3])
     assert result.iloc[4] == 1003.0
+
+
+def test_missing_asset_interval_fails_closed_instead_of_rolling_past_gap():
+    asset, peer = feeds()
+    asset = asset.drop(index=3).reset_index(drop=True)
+    with pytest.raises(ValueError, match="irregular 15-minute"):
+        align_previous_benchmark(asset, peer)

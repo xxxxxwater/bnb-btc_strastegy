@@ -227,6 +227,10 @@ def infer_probabilities(
     intercept = np.asarray(model["intercept"], dtype=float)
     if scale.shape != (mat.shape[1],) or coef.shape != (3, mat.shape[1],):
         raise ValueError("MLSD coefficient dimensions mismatch")
+    if (not np.isfinite(mat).all() or not np.isfinite(center).all()
+            or not np.isfinite(scale).all() or (scale <= 0).any()
+            or not np.isfinite(coef).all() or not np.isfinite(intercept).all()):
+        raise ValueError("invalid MLSD feature matrix or model coefficients")
     logits = ((mat - center) / scale) @ coef.T + intercept
     logits -= logits.max(axis=1, keepdims=True)
     probs = np.exp(logits)

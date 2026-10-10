@@ -102,3 +102,32 @@ def test_invalid_model_schema_and_matrix_are_rejected(tmp_path):
     path.write_text(json.dumps(model), encoding="utf-8")
     with pytest.raises(ValueError, match="revision"):
         read_model(path)
+
+
+def test_artifact_rejects_duplicate_json_keys_and_wrong_lag(tmp_path):
+    path = tmp_path / "model.json"
+    path.write_text('{"schema":"a","schema":"b"}', encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate model JSON key"):
+        read_model(path)
+    path.write_text(json.dumps({"schema": "bnb-btc-mlsd/v2",
+                                "benchmark_lag_bars": 0}), encoding="utf-8")
+    with pytest.raises(ValueError, match="lag contract"):
+        read_model(path)
+
+
+def test_full_data_fingerprint_changes_with_ohlcv_peer_and_time():
+    from bnb_btc_strategy.mlsd_layer import dataset_fingerprint
+
+    bars, peer = sample(80)
+    reference = dataset_fingerprint(bars, peer)
+    changed_high = bars.copy()
+    changed_high.loc[20, "high"] *= 1.01
+    assert dataset_fingerprint(changed_high, peer) != reference
+
+    changed_peer = peer.copy()
+    changed_peer.loc[20] *= 1.01
+    assert dataset_fingerprint(bars, changed_peer) != reference
+
+    shifted = bars.copy()
+    shifted["date"] += pd.Timedelta(minutes=15)
+    assert dataset_fingerprint(shifted, peer) != reference

@@ -44,6 +44,8 @@ def align_previous_benchmark(
     """
     asset_times = _timestamps(asset, "asset")
     peer_times = _timestamps(peer, "benchmark")
+    if len(asset_times) > 1 and not (asset_times[1:] - asset_times[:-1] == BAR).all():
+        raise ValueError("asset has missing or irregular 15-minute candles")
     if "close" not in peer.columns:
         raise ValueError("benchmark must contain close")
     if "close" not in asset.columns:
