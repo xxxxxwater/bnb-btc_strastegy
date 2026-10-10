@@ -65,7 +65,7 @@ def test_corrupt_peer_or_irregular_dates_fail_closed():
     with pytest.raises(ValueError, match="index must exactly"):
         extract_mlsd_features(bars, broken.reset_index(drop=True).iloc[::-1])
     bars.loc[80, "date"] += pd.Timedelta(minutes=1)
-    with pytest.raises(ValueError, match="contiguous 15m"):
+    with pytest.raises(ValueError, match="15m UTC grid|contiguous 15m"):
         make_structured_frame(bars, peer)
 
 
