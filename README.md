@@ -13,7 +13,7 @@
 
 This release corrects a **material** data-integrity risk in v0.4.0: the Freqtrade same-timeframe informative merge could use a different benchmark candle from the offline trainer. Training, CSV export, and execution now share one strict timestamp adapter: at asset candle opening time **t**, they use **only** the benchmark candle opening at **t−15 minutes**.
 
-- **No future candle / stale forward fill:** a missing, off-grid, duplicate or old peer candle cannot silently become the newest price. Asset time-grid gaps disable entries.
+- **No future candle / stale forward fill:** a missing, off-grid, duplicate or old peer candle (including Freqtrade's zero-volume gap-fill rows) cannot silently become the newest price. Asset time-grid gaps disable entries.
 - **Auditable MLSD model schema v2:** model JSON requires exactly 105 ordered BasicSeries features, an explicit one-bar benchmark lag, pair identity, label maturity and a complete timestamp/OHLCV/peer dataset fingerprint.
 - **Security:** duplicate JSON object keys are rejected, coefficients and scaler must be finite, and model exports never deserialize pickle.
 - **Observability:** MLSD eligibility is calculated **per candle**, rather than displaying a misleading always-true gate.

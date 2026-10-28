@@ -5,6 +5,8 @@ row with open timestamp t, the benchmark is only allowed to use its
 previous candle (open t-15m), not the potentially still-forming row at t.
 
 No ffill, bfill or nearest merge: a missing prior peer bar fails closed.
+When the peer frame carries volume, zero-volume rows (Freqtrade's synthetic
+gap fill) count as missing too.
 """
 from __future__ import annotations
 
@@ -51,7 +53,13 @@ def align_previous_benchmark(
     if "close" not in asset.columns:
         raise ValueError("asset must contain close")
     values = pd.to_numeric(peer["close"], errors="coerce").to_numpy(dtype=float)
-    values = np.where(np.isfinite(values) & (values > 0), values, np.nan)
+    usable = np.isfinite(values) & (values > 0)
+    if "volume" in peer.columns:
+        # Freqtrade's ohlcv_fill_up_missing_data turns a missing candle into a
+        # zero-volume row carrying the previous close: a stale forward fill.
+        volume = pd.to_numeric(peer["volume"], errors="coerce").to_numpy(dtype=float)
+        usable &= np.isfinite(volume) & (volume > 0)
+    values = np.where(usable, values, np.nan)
     # The shift is on the time axis, NOT the peer row position. A gap cannot
     # accidentally be filled by the next available row.
     available_at = peer_times + BAR
