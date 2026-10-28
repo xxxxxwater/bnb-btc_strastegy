@@ -164,6 +164,18 @@ def train_offline(
     return artifact, report
 
 
+def _write_json_atomic(path: Path, payload: dict, validate=None) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        temp.write_text(json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8")
+        if validate is not None:
+            validate(temp)
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     from .cli import load_csv
     from .market_data import align_previous_benchmark
@@ -188,16 +200,12 @@ def main(argv: list[str] | None = None) -> int:
         asset, aligned, horizon=args.horizon, window=args.window,
         fee_threshold=args.fee_threshold, asset_pair=args.asset_pair
     )
-    # Atomic writes: no partially readable artifact.
+    # Atomic writes: no partially readable artifact. Validate the temp file
+    # BEFORE replacing, so a rejected artifact never overwrites a working model.
     destination = Path(args.model_output)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temp = destination.with_suffix(destination.suffix + ".tmp")
-    temp.write_text(json.dumps(artifact, indent=2, allow_nan=False), encoding="utf-8")
-    temp.replace(destination)
-    read_model(destination)
     target = Path(args.report_output)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
+    _write_json_atomic(destination, artifact, validate=read_model)
+    _write_json_atomic(target, report)
     print(json.dumps({"model": str(destination), "report": str(target),
                       "holdout": report["holdout"]}))
     return 0

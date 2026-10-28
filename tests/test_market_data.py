@@ -81,3 +81,17 @@ def test_missing_asset_interval_fails_closed_instead_of_rolling_past_gap():
     asset = asset.drop(index=3).reset_index(drop=True)
     with pytest.raises(ValueError, match="irregular 15-minute"):
         align_previous_benchmark(asset, peer)
+
+
+def test_freqtrade_zero_volume_gap_fill_is_not_a_peer_observation():
+    asset, peer = feeds()
+    peer["volume"] = 5.0
+    # Freqtrade ohlcv_fill_up_missing_data: previous close, zero volume.
+    peer.loc[3, "close"] = peer.loc[2, "close"]
+    peer.loc[3, "volume"] = 0.0
+    peer.loc[5, "volume"] = np.nan
+    result = align_previous_benchmark(asset, peer)
+    assert np.isnan(result.iloc[4])
+    assert np.isnan(result.iloc[6])
+    assert result.iloc[5] == 1004.0
+    assert result.iloc[7] == 1006.0
