@@ -25,6 +25,9 @@ def _timestamps(frame: pd.DataFrame, name: str) -> pd.DatetimeIndex:
         dates = pd.DatetimeIndex(pd.to_datetime(frame.index, utc=True))
     else:
         raise ValueError(f"{name} must have a date column or DatetimeIndex")
+    # asi8 is in the index's own unit. Freqtrade 2026.x loads backtest data as
+    # datetime64[ms] (pandas 3 yields us), so normalize before the grid check.
+    dates = dates.as_unit("ns")
     if dates.hasnans or not dates.is_unique or not dates.is_monotonic_increasing:
         raise ValueError(f"{name} has missing, duplicate or unsorted timestamps")
     if (dates.asi8 % BAR.value != 0).any():

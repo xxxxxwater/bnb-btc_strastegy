@@ -36,6 +36,8 @@ def _validate_and_extract(
         timestamps = pd.DatetimeIndex(pd.to_datetime(candles.index, utc=True))
     else:
         raise ValueError("asset needs a UTC-compatible date column or DatetimeIndex")
+    # Same nanosecond grid as market_data: ms/us inputs must not fail asi8 math.
+    timestamps = timestamps.as_unit("ns")
     if (timestamps.hasnans or not timestamps.is_unique
             or not timestamps.is_monotonic_increasing):
         raise ValueError("asset timestamps must be strictly increasing and unique")
