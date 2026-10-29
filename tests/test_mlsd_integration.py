@@ -169,3 +169,17 @@ def test_training_rejects_nonfinite_tuning_values(key):
     bars, peer = sample(100)
     with pytest.raises(ValueError, match=key):
         train_offline(bars, peer, **{key: float("nan")})
+
+
+def test_mlsd_features_and_fingerprint_ignore_datetime_resolution():
+    from bnb_btc_strategy.mlsd_layer import dataset_fingerprint
+
+    bars, peer = sample(80)
+    reference, positions = extract_mlsd_features(bars, peer)
+    fingerprint = dataset_fingerprint(bars, peer)
+    millis = bars.copy()
+    millis["date"] = millis["date"].dt.as_unit("ms")
+    features, millis_positions = extract_mlsd_features(millis, peer)
+    assert np.array_equal(positions, millis_positions)
+    pd.testing.assert_frame_equal(features, reference)
+    assert dataset_fingerprint(millis, peer) == fingerprint
